@@ -5,6 +5,7 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <UserSecretsId>dotnet-Factory-a69b624b-6dd0-4d5b-a763-8970fc814d27</UserSecretsId>
+    <DockerDefaultTargetOS>Linux</DockerDefaultTargetOS>
   </PropertyGroup>
 
   <ItemGroup>
@@ -12,5 +13,10 @@
     <PackageReference Include="Confluent.SchemaRegistry" Version="2.2.0" />
     <PackageReference Include="Confluent.SchemaRegistry.Serdes.Json" Version="2.2.0" />
     <PackageReference Include="Microsoft.Extensions.Hosting" Version="6.0.1" />
+    <PackageReference Include="Microsoft.VisualStudio.Azure.Containers.Tools.Targets" Version="1.18.1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Shared\Shared.csproj" />
   </ItemGroup>
 </Project>

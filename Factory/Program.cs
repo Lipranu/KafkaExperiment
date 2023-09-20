@@ -1,10 +1,10 @@
 using Confluent.Kafka;
-//using Confluent.Kafka.SyncOverAsync;
+using Confluent.Kafka.SyncOverAsync;
 using Confluent.SchemaRegistry.Serdes;
 using Confluent.SchemaRegistry;
 using Factory;
+using Shared;
 using Microsoft.Extensions.Options;
-using Confluent.Kafka.SyncOverAsync;
 
 IHost host = Host.CreateDefaultBuilder(args)
     .ConfigureServices((hostContext, services) =>
@@ -14,7 +14,12 @@ IHost host = Host.CreateDefaultBuilder(args)
         services.Configure<ConsumerConfig>(hostConfig.GetSection("KafkaConsumer"));
         services.Configure<ProducerConfig>(hostConfig.GetSection("KafkaProducer"));
 
-        services.AddSingleton(sp => new Factory.Factory());
+        services.AddSingleton(sp =>
+        {
+            var id = Guid.Parse(Environment.GetEnvironmentVariable("FACTORY_ID")!);
+            var logger = sp.GetRequiredService<ILogger<Factory.Factory>>();
+            return new Factory.Factory(id, logger);
+        });
 
         services.AddSingleton<ISchemaRegistryClient>(sp =>
         {
@@ -22,23 +27,35 @@ IHost host = Host.CreateDefaultBuilder(args)
             return new CachedSchemaRegistryClient(config.Value);
         });
 
-        services.AddSingleton<IConsumer<Guid, string>>(sp =>
+        services.AddSingleton(sp =>
         {
             var config = sp.GetRequiredService<IOptions<ConsumerConfig>>();
-            return new ConsumerBuilder<Guid, string>(config.Value)
+            return new ConsumerBuilder<Ignore, string>(config.Value)
+                .SetKeyDeserializer(Deserializers.Ignore)
                 .SetValueDeserializer(new JsonDeserializer<string>().AsSyncOverAsync())
                 .Build();
         });
 
-        services.AddSingleton<IProducer<Guid, string>>(sp =>
+        services.AddSingleton(sp =>
         {
             var config = sp.GetRequiredService<IOptions<ProducerConfig>>();
             var schema = sp.GetRequiredService<ISchemaRegistryClient>();
-            return new ProducerBuilder<Guid, string>(config.Value)
-                .SetValueSerializer(new JsonSerializer<string>(schema))
+            return new ProducerBuilder<int, FactoryInfo>(config.Value)
+                .SetKeySerializer(Serializers.Int32)
+                .SetValueSerializer(new JsonSerializer<FactoryInfo>(schema))
                 .Build();
         });
+        //services.AddSingleton(sp =>
+        //{
+        //    var config = sp.GetRequiredService<IOptions<ProducerConfig>>();
+        //    //var schema = sp.GetRequiredService<ISchemaRegistryClient>();
+        //    return new ProducerBuilder<int, int>(config.Value)
+        //        .SetKeySerializer(Serializers.Int32)
+        //        .SetValueSerializer(Serializers.Int32)
+        //        .Build();
+        //});
         services.AddHostedService<Worker>();
+        services.AddHostedService<Notifier>();
     })
     .Build();
 

@@ -1,0 +1,136 @@
+﻿@page "/"
+@using Microsoft.AspNetCore.SignalR.Client
+@using Shared
+@inject NavigationManager Navigation
+@implements IAsyncDisposable
+
+<PageTitle>Monitor</PageTitle>
+<h1>Awesome Factory Monitor!!!</h1>
+<table class="table">
+    <thead>
+        <tr>
+            <th scope="col">ID</th>
+            <th scope="col">State</th>
+            <th scope="col">Status</th>
+            <th scope="col">Control</th>
+        </tr>
+    </thead>
+    <tbody>
+        @foreach (var info in infos)
+        {
+            <tr>
+                <td>@info.Item1.ID.ToString()</td>
+                <td>@info.Item1.State.ToString()</td>
+                <td>@info.Item1.Status.ToString()</td>
+                <td>@if (info.Item1.State != FactoryState.Broken)
+                    {
+                        var text = info.Item1.State == FactoryState.Running ? "Turn Off" : "Turn On";
+                        @if(info.Item2)
+                        {
+                            <button disabled>@text</button>
+                        }
+                        else
+                        {
+                            <button @onclick="_ => InvokeMessage(info.Item1)">@text</button>
+                        }
+                    }
+                </td>
+            </tr>
+        }
+    </tbody>
+</table>
+
+@code  
+{
+    private HubConnection? hubConnection;
+    private List<(FactoryInfo, bool)> infos = new();
+    //@onclick="_ => this.InvokeMessage(info.Item1)">
+    protected override async Task OnInitializedAsync()
+    {
+        hubConnection = new HubConnectionBuilder()
+            .WithUrl("https://monitor:443/factory_info_hub", conf =>
+            {
+                conf.HttpMessageHandlerFactory = _ => new HttpClientHandler
+                {
+                    ServerCertificateCustomValidationCallback = HttpClientHandler.DangerousAcceptAnyServerCertificateValidator
+                };
+            })  //Navigation.ToAbsoluteUri("/factory_info_hub"))
+            .Build();
+
+        hubConnection.On<FactoryInfo>("SendInfo", info =>
+        {
+
+            List<(FactoryInfo, bool)> list = new();
+            var exist = false;
+            infos.ForEach(row =>
+            {
+                var clicked = row.Item2;
+                if (row.Item1.ID == info.ID)
+                {
+                    var old = row.Item1;
+                    if ((old.State != info.State) && clicked)
+                    {
+                        clicked = false;
+                    }
+                    old.State = info.State;
+                    old.Status = info.Status;
+                    exist = true;
+                }
+                list.Add((row.Item1, clicked));
+            });
+            infos = list;
+            //var exist = false;
+            //infos.ForEach(row =>
+            //{
+            //    var old = row.Item1;
+            //    if (old.ID == info.ID)
+            //    {
+            //        old.State = info.State;
+            //        old.Status = info.Status;
+            //        exist = true;
+            //    }
+            //});
+            //
+            if (!exist)
+            {
+                list.Add((info, false));
+            }
+
+            InvokeAsync(StateHasChanged);
+        });
+
+        await hubConnection.StartAsync();
+    }
+
+    public EventCallback InvokeMessage(FactoryInfo info)
+    {
+        //var stateChanged = false;
+        List<(FactoryInfo, bool)> list = new();
+        infos.ForEach(row =>
+        {
+            var clicked = false;
+            if (row.Item1.ID == info.ID)
+            {
+                clicked = true;
+
+            }
+            list.Add((row.Item1, clicked));
+        });
+        infos = list;
+        //stateChanged = infos.
+        //if (stateChanged)
+        //{
+        //    this.StateHasChanged();
+        //}
+        return new EventCallback(); // () => Task.CompletedTask;
+                                    //await hubConnection!.InvokeAsync<Guid>("", info.ID);
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (hubConnection is not null)
+        {
+            await hubConnection.DisposeAsync();
+        }
+    }
+}
