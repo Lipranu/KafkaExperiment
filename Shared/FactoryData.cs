@@ -3,6 +3,7 @@
     public enum FactoryState
     {
         Running,
+        Stopped,
         Broken
     }
 

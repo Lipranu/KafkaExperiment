@@ -2,9 +2,10 @@ using Confluent.Kafka;
 using Confluent.Kafka.SyncOverAsync;
 using Confluent.SchemaRegistry.Serdes;
 using Confluent.SchemaRegistry;
-using Factory;
 using Shared;
 using Microsoft.Extensions.Options;
+using Factory.Services;
+using Factory.Model;
 
 IHost host = Host.CreateDefaultBuilder(args)
     .ConfigureServices((hostContext, services) =>
@@ -17,8 +18,8 @@ IHost host = Host.CreateDefaultBuilder(args)
         services.AddSingleton(sp =>
         {
             var id = Guid.Parse(Environment.GetEnvironmentVariable("FACTORY_ID")!);
-            var logger = sp.GetRequiredService<ILogger<Factory.Factory>>();
-            return new Factory.Factory(id, logger);
+            var logger = sp.GetRequiredService<ILogger<FactoryModel>>();
+            return new FactoryModel(id, logger);
         });
 
         services.AddSingleton<ISchemaRegistryClient>(sp =>
@@ -27,6 +28,7 @@ IHost host = Host.CreateDefaultBuilder(args)
             return new CachedSchemaRegistryClient(config.Value);
         });
 
+        //services.A
         services.AddSingleton(sp =>
         {
             var config = sp.GetRequiredService<IOptions<ConsumerConfig>>();
@@ -45,17 +47,18 @@ IHost host = Host.CreateDefaultBuilder(args)
                 .SetValueSerializer(new JsonSerializer<FactoryInfo>(schema))
                 .Build();
         });
-        //services.AddSingleton(sp =>
-        //{
-        //    var config = sp.GetRequiredService<IOptions<ProducerConfig>>();
-        //    //var schema = sp.GetRequiredService<ISchemaRegistryClient>();
-        //    return new ProducerBuilder<int, int>(config.Value)
-        //        .SetKeySerializer(Serializers.Int32)
-        //        .SetValueSerializer(Serializers.Int32)
-        //        .Build();
-        //});
-        services.AddHostedService<Worker>();
-        services.AddHostedService<Notifier>();
+        services.AddSingleton(sp =>
+        {
+            var config = sp.GetRequiredService<IOptions<ProducerConfig>>();
+            return new ConsumerBuilder<string, Null>(config.Value)
+                .SetKeyDeserializer(Deserializers.Utf8)
+                .SetValueDeserializer(Deserializers.Null)
+                .Build();
+        });
+
+        services.AddHostedService<WorkerService>();
+        services.AddHostedService<NotifierService>();
+        services.AddHostedService<ListenerService>();
     })
     .Build();
 

@@ -31,6 +31,15 @@ services.AddSingleton(sp =>
         .Build();
 });
 
+services.AddSingleton(sp =>
+{
+    var config = sp.GetRequiredService<IOptions<ProducerConfig>>();
+    return new ProducerBuilder<int, Null>(config.Value)
+        .SetKeySerializer(Serializers.Int32)
+        .SetValueSerializer(Serializers.Null)
+        .Build();
+});
+
 services.AddHostedService<ReceiverService>();
 
 var app = builder.Build();

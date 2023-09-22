@@ -1,21 +1,19 @@
 ﻿using Confluent.Kafka;
 using Shared;
+using Factory.Model;
 
-namespace Factory
+namespace Factory.Services
 {
-    public class Notifier : BackgroundService
+    public class NotifierService : BackgroundService
     {
-        private const string FactoryInfoTopicName = "FactoryInfo";
-        private readonly ILogger<Notifier> _logger;
+        private readonly ILogger<NotifierService> _logger;
         private readonly IProducer<int, FactoryInfo> _producer;
-        //private readonly IProducer<int, int> _producer;
-        private readonly Factory _factory;
+        private readonly FactoryModel _factory;
 
-        public Notifier(
-            ILogger<Notifier> logger, 
+        public NotifierService(
+            ILogger<NotifierService> logger,
             IProducer<int, FactoryInfo> producer,
-            //IProducer<int, int> producer,
-            Factory factory)
+            FactoryModel factory)
         {
             _logger = logger;
             _producer = producer;
@@ -30,25 +28,24 @@ namespace Factory
                 _logger.LogInformation("Getting state");
                 var factoryInfo = await _factory.GetInfoAsync(ct);
                 _logger.LogInformation("State: {}", factoryInfo.State);
-                //_producer.
                 _logger.LogInformation("Sending Message");
                 var message = new Message<int, FactoryInfo>()
                 {
                     Key = (int)factoryInfo.State,
                     Value = factoryInfo
                 };
-                //var message = new Message<int, int> { Key = (int)factoryInfo.State, Value = (int)factoryInfo.Status };
+      
                 try
                 {
-                    var result = await _producer.ProduceAsync(FactoryInfoTopicName, message, ct);
+                    var result = await _producer.ProduceAsync(TopicHelper.FactoryInfoTopic, message, ct);
                     _producer.Flush(ct);
 
                     _logger.LogInformation(
                     "{status} is writed to partition {partition}",
-                    result.Value,//.Status,
+                    result.Value,
                     result.Partition.Value);
                 }
-                catch(Exception ex)
+                catch (Exception ex)
                 {
                     _logger.LogError(ex.Message);
                 }

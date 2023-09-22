@@ -1,17 +1,19 @@
-namespace Factory
-{
-    public class Worker : BackgroundService
-    {
-        private readonly ILogger<Worker> _logger;
-        private readonly Factory _factory;
+using Factory.Model;
 
-        public Worker(ILogger<Worker> logger, Factory factory)
+namespace Factory.Services
+{
+    public class WorkerService : BackgroundService
+    {
+        private readonly ILogger<WorkerService> _logger;
+        private readonly FactoryModel _factory;
+
+        public WorkerService(ILogger<WorkerService> logger, FactoryModel factory)
         {
             _logger = logger;
             _factory = factory;
         }
 
-        
+
         protected override async Task ExecuteAsync(CancellationToken ct)
         {
             _logger.LogInformation("Worker servise started");
