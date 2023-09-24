@@ -5,13 +5,18 @@ using Microsoft.AspNetCore.ResponseCompression;
 using Microsoft.Extensions.Options;
 using Monitor.Hubs;
 using Monitor.Services;
+using Newtonsoft.Json.Linq;
 using Shared;
+using Shared.Serdes;
+using System.Reflection.Metadata.Ecma335;
+using static System.Runtime.InteropServices.JavaScript.JSType;
 
 var builder = WebApplication.CreateBuilder(args);
 var services = builder.Services;
 var config = builder.Configuration;
 
 services.Configure<ConsumerConfig>(config.GetSection("KafkaConsumer"));
+services.Configure<ProducerConfig>(config.GetSection("KafkaProducer"));
 
 services.AddRazorPages();
 services.AddServerSideBlazor();
@@ -23,9 +28,8 @@ services.AddResponseCompression(opts =>
 
 services.AddSingleton(sp =>
 {
-    var config = sp.GetRequiredService<IOptions<ConsumerConfig>>();
-
-    return new ConsumerBuilder<Ignore, FactoryInfo>(config.Value)
+    var config = sp.GetRequiredService<IOptions<ConsumerConfig>>().Value;
+    return new ConsumerBuilder<Ignore, FactoryInfo>(config)
         .SetKeyDeserializer(Deserializers.Ignore)
         .SetValueDeserializer(new JsonDeserializer<FactoryInfo>().AsSyncOverAsync())
         .Build();
@@ -33,9 +37,9 @@ services.AddSingleton(sp =>
 
 services.AddSingleton(sp =>
 {
-    var config = sp.GetRequiredService<IOptions<ProducerConfig>>();
-    return new ProducerBuilder<int, Null>(config.Value)
-        .SetKeySerializer(Serializers.Int32)
+    var config = sp.GetRequiredService<IOptions<ProducerConfig>>().Value;
+    return new ProducerBuilder<Guid, Null>(config)
+        .SetKeySerializer(new GuidSerializer())
         .SetValueSerializer(Serializers.Null)
         .Build();
 });

@@ -24,10 +24,17 @@ namespace Monitor.Services
         protected override async Task ExecuteAsync(CancellationToken ct)
         {
             _logger.LogInformation("ReceiverService started");
-            _consumer.Subscribe(TopicHelper.FactoryInfoTopic);
+            
+            List<TopicPartitionOffset> assigment = new();
+            for (int partition = 0; partition < 5; partition++)
+            {
+                TopicPartition tp = new(TopicHelper.FactoryInfoTopic, partition);
+                assigment.Add(new TopicPartitionOffset(tp, Offset.End));
+            }
+            _consumer.Assign(assigment);
+
             while (!ct.IsCancellationRequested)
             {
-
                 try
                 {
                     var info = _consumer.Consume(ct).Message.Value;
@@ -38,12 +45,13 @@ namespace Monitor.Services
                 }
                 catch (Exception ex)
                 {
-
                     _logger.LogError(ex.Message);
                 }
-                await Task.Delay(100, ct);
+                await Task.Delay(25, ct);
             }
+
             _consumer.Close();
+            _logger.LogInformation("ReceiverService stopped");
         }
     }
 }

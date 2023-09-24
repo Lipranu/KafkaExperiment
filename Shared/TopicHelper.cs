@@ -2,8 +2,9 @@
 {
     public static class TopicHelper
     {
-        public const string FactoryInfoTopic = "FactoryInfo";
-        public const string FactorySwitchTopic = "FactorySwitch";
-        public const string FactoryRepairTopic = "FactoryRepair";
+        public const string FactoryDataTopic = "factory.data";
+        public const string FactoryInfoTopic = "factory.info";
+        public const string FactorySwitchTopic = "factory.switch";
+        public const string FactoryRepairTopic = "factory.repair";
     }
 }

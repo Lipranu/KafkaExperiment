@@ -1,18 +1,18 @@
 ﻿using Confluent.Kafka;
 using Shared;
-using Factory.Model;
+using Factory.Models;
 
 namespace Factory.Services
 {
     public class NotifierService : BackgroundService
     {
         private readonly ILogger<NotifierService> _logger;
-        private readonly IProducer<int, FactoryInfo> _producer;
+        private readonly IProducer<Guid, FactoryInfo> _producer;
         private readonly FactoryModel _factory;
 
         public NotifierService(
             ILogger<NotifierService> logger,
-            IProducer<int, FactoryInfo> producer,
+            IProducer<Guid, FactoryInfo> producer,
             FactoryModel factory)
         {
             _logger = logger;
@@ -29,15 +29,25 @@ namespace Factory.Services
                 var factoryInfo = await _factory.GetInfoAsync(ct);
                 _logger.LogInformation("State: {}", factoryInfo.State);
                 _logger.LogInformation("Sending Message");
-                var message = new Message<int, FactoryInfo>()
+                var message = new Message<Guid, FactoryInfo>()
                 {
-                    Key = (int)factoryInfo.State,
+                    Key = factoryInfo.ID,
                     Value = factoryInfo
                 };
       
                 try
                 {
-                    var result = await _producer.ProduceAsync(TopicHelper.FactoryInfoTopic, message, ct);
+                    DeliveryResult<Guid, FactoryInfo> result;
+                    if (factoryInfo.State == FactoryState.Broken)
+                    {
+                        TopicPartition partition = new(TopicHelper.FactoryInfoTopic, new Partition(5));
+                        result = await _producer.ProduceAsync(partition, message, ct);
+                    }
+                    else
+                    {
+                        result = await _producer.ProduceAsync(TopicHelper.FactoryInfoTopic, message, ct);
+                    }
+                    result = await _producer.ProduceAsync(TopicHelper.FactoryInfoTopic, message, ct);
                     _producer.Flush(ct);
 
                     _logger.LogInformation(

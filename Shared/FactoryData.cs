@@ -1,5 +1,12 @@
 ﻿namespace Shared
 {
+    public class FactoryData
+    {
+        public Guid ID { get; set; }
+        public DateTime Time { get; set; }
+        public int Value { get; set; }
+    }
+
     public enum FactoryState
     {
         Running,

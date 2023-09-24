@@ -1,6 +1,6 @@
 ﻿using Shared;
 
-namespace Factory.Model
+namespace Factory.Models
 {
     public class FactoryModel
     {
@@ -19,6 +19,8 @@ namespace Factory.Model
             _state = FactoryState.Stopped;
         }
 
+        public Guid ID { get { return _id; } }
+
         internal async Task<FactoryInfo> GetInfoAsync(CancellationToken ct)
         {
             _logger.LogDebug("GetInfoAsync requested");
@@ -34,7 +36,7 @@ namespace Factory.Model
             }
         }
 
-        internal async Task DoWorkAsync(CancellationToken ct)
+        internal async Task<FactoryData?> DoWorkAsync(CancellationToken ct)
         {
             _logger.LogDebug($"Factory do work requested");
             await _semaphore.WaitAsync(ct);
@@ -42,17 +44,18 @@ namespace Factory.Model
             {
                 if (_state != FactoryState.Running)
                 {
-                    return;
+                    return null;
                 }
                 else
                 {
                     _logger.LogDebug("Factory do work. Status: {status}", _status);
-                    _status -= _random.NextDouble();
+                    _status -= (_random.NextDouble() / 100);
                     _logger.LogDebug("Factory work done. Status: {status}", _status);
                     if (_status < 1.0) 
                     {
                         _state = FactoryState.Broken;
                     }
+                    return new FactoryData { ID = _id, Time = DateTime.Now, Value = _random.Next() };
                 }
             }
             finally

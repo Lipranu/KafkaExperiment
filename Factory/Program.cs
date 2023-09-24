@@ -5,19 +5,22 @@ using Confluent.SchemaRegistry;
 using Shared;
 using Microsoft.Extensions.Options;
 using Factory.Services;
-using Factory.Model;
+using Factory.Models;
+using Shared.Serdes;
+using System.Text;
 
 IHost host = Host.CreateDefaultBuilder(args)
     .ConfigureServices((hostContext, services) =>
     {
         var hostConfig = hostContext.Configuration;
+        var id = Guid.Parse(Environment.GetEnvironmentVariable("FACTORY_ID")!);
+
         services.Configure<SchemaRegistryConfig>(hostConfig.GetSection("SchemaRegistry"));
         services.Configure<ConsumerConfig>(hostConfig.GetSection("KafkaConsumer"));
         services.Configure<ProducerConfig>(hostConfig.GetSection("KafkaProducer"));
 
         services.AddSingleton(sp =>
         {
-            var id = Guid.Parse(Environment.GetEnvironmentVariable("FACTORY_ID")!);
             var logger = sp.GetRequiredService<ILogger<FactoryModel>>();
             return new FactoryModel(id, logger);
         });
@@ -28,31 +31,61 @@ IHost host = Host.CreateDefaultBuilder(args)
             return new CachedSchemaRegistryClient(config.Value);
         });
 
-        //services.A
         services.AddSingleton(sp =>
         {
-            var config = sp.GetRequiredService<IOptions<ConsumerConfig>>();
-            return new ConsumerBuilder<Ignore, string>(config.Value)
-                .SetKeyDeserializer(Deserializers.Ignore)
-                .SetValueDeserializer(new JsonDeserializer<string>().AsSyncOverAsync())
+            var config = sp.GetRequiredService<IOptions<ConsumerConfig>>().Value;
+            var sid = new StringBuilder("Factory(")
+                .Append(id.ToString())
+                .Append(')')
+                .ToString();
+            config.GroupId = sid;
+            config.ClientId = sid;
+
+            return new ConsumerBuilder<Guid, Null>(config)
+                .SetKeyDeserializer(new GuidDeserializer())
+                .SetValueDeserializer(Deserializers.Null)
                 .Build();
         });
 
         services.AddSingleton(sp =>
         {
-            var config = sp.GetRequiredService<IOptions<ProducerConfig>>();
+            var config = sp.GetRequiredService<IOptions<ProducerConfig>>().Value;
+            config.ClientId = new StringBuilder("FactoryInfo(")
+                .Append(id.ToString())
+                .Append(')')
+                .ToString();
+            config.EnableIdempotence = false;
+            config.Acks = Acks.None;
+            config.BatchNumMessages = 1;
+            config.MessageSendMaxRetries = 0;
+            config.Partitioner = Partitioner.Consistent;
+
             var schema = sp.GetRequiredService<ISchemaRegistryClient>();
-            return new ProducerBuilder<int, FactoryInfo>(config.Value)
-                .SetKeySerializer(Serializers.Int32)
-                .SetValueSerializer(new JsonSerializer<FactoryInfo>(schema))
+
+            return new ProducerBuilder<Guid, FactoryInfo>(config)
+                .SetKeySerializer(new GuidSerializer())
+                .SetValueSerializer(new JsonSerializer<FactoryInfo>(schema).AsSyncOverAsync())
                 .Build();
         });
+
         services.AddSingleton(sp =>
         {
-            var config = sp.GetRequiredService<IOptions<ProducerConfig>>();
-            return new ConsumerBuilder<string, Null>(config.Value)
-                .SetKeyDeserializer(Deserializers.Utf8)
-                .SetValueDeserializer(Deserializers.Null)
+            var config = sp.GetRequiredService<IOptions<ProducerConfig>>().Value;
+            config.ClientId = new StringBuilder("FactoryData(")
+                .Append(id.ToString())
+                .Append(')')
+                .ToString();
+            config.EnableIdempotence = true;
+            config.Acks = Acks.All;
+            config.BatchNumMessages = 1000;
+            config.MessageSendMaxRetries = 10;
+            config.Partitioner = Partitioner.Murmur2;
+
+            var schema = sp.GetRequiredService<ISchemaRegistryClient>();
+
+            return new ProducerBuilder<Guid, FactoryData>(config)
+                .SetKeySerializer(new GuidSerializer())
+                .SetValueSerializer(new JsonSerializer<FactoryData>(schema))
                 .Build();
         });
 

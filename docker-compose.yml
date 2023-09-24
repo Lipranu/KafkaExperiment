@@ -21,10 +21,10 @@ services:
   factory:
     image: ${DOCKER_REGISTRY-}factory
     hostname: factory
+    container_name: factory0
     build:
       context: .
       dockerfile: Factory/Dockerfile
-      #target: factory
     depends_on:
       - schema-registry
     environment:
@@ -33,10 +33,10 @@ services:
   factory2:
     image: ${DOCKER_REGISTRY-}factory
     hostname: factory2
+    container_name: factory2
     build:
       context: .
       dockerfile: Factory/Dockerfile
-      #target: factory
     depends_on:
       - schema-registry
     environment:
@@ -45,17 +45,17 @@ services:
   factory3:
     image: ${DOCKER_REGISTRY-}factory
     hostname: factory3
+    container_name: factory3
     build:
       context: .
       dockerfile: Factory/Dockerfile
-      #target: factory
     depends_on:
       - schema-registry
     environment:
       FACTORY_ID: 'ad1c3084-2523-442c-ac9f-b7376cd16d42'
 
   zookeeper:
-    image: confluentinc/cp-zookeeper:6.1.1
+    image: confluentinc/cp-zookeeper:7.2.1
     hostname: zookeeper
     container_name: zookeeper
     ports:
@@ -65,7 +65,7 @@ services:
       ZOOKEEPER_TICK_TIME: 2000
 
   broker1:
-    image: confluentinc/cp-kafka:6.1.1
+    image: confluentinc/cp-kafka:7.2.1
     hostname: broker1
     container_name: broker1
     depends_on:
@@ -74,6 +74,8 @@ services:
       - "29092:29092"
       - "9092:9092"
       - "9101:9101"
+    volumes:
+      - "./kafka/server.properties:/etc/kafka/server.properties"
     environment:
       KAFKA_BROKER_ID: 1
       KAFKA_ZOOKEEPER_CONNECT: 'zookeeper:2181'
@@ -84,10 +86,10 @@ services:
       KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 3
       KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
       KAFKA_JMX_PORT: 9101
-      KAFKA_JMX_HOSTNAME: localhost
+      KAFKA_JMX_HOSTNAME: broker1
 
   broker2:
-    image: confluentinc/cp-kafka:6.1.1
+    image: confluentinc/cp-kafka:7.2.1
     hostname: broker2
     container_name: broker2
     depends_on:
@@ -96,6 +98,8 @@ services:
       - "29093:29093"
       - "9093:9093"
       - "9201:9201"
+    volumes:
+      - "./kafka/server.properties:/etc/config/server.properties"
     environment:
       KAFKA_BROKER_ID: 2
       KAFKA_ZOOKEEPER_CONNECT: 'zookeeper:2181'
@@ -105,11 +109,11 @@ services:
       KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 3
       KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 3
       KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
-      KAFKA_JMX_PORT: 9201
-      KAFKA_JMX_HOSTNAME: localhost
+      KAFKA_JMX_PORT: 9101
+      KAFKA_JMX_HOSTNAME: broker2
 
   broker3:
-    image: confluentinc/cp-kafka:6.1.1
+    image: confluentinc/cp-kafka:7.2.1
     hostname: broker3
     container_name: broker3
     depends_on:
@@ -118,6 +122,8 @@ services:
       - "29094:29094"
       - "9094:9094"
       - "9301:9301"
+    volumes:
+      - "./kafka/server.properties:/etc/kafka/server.properties"
     environment:
       KAFKA_BROKER_ID: 3
       KAFKA_ZOOKEEPER_CONNECT: 'zookeeper:2181'
@@ -127,11 +133,11 @@ services:
       KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 3
       KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 3
       KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
-      KAFKA_JMX_PORT: 9301
-      KAFKA_JMX_HOSTNAME: localhost
+      KAFKA_JMX_PORT: 9101
+      KAFKA_JMX_HOSTNAME: broker3
 
   schema-registry:
-    image: confluentinc/cp-schema-registry:6.1.1
+    image: confluentinc/cp-schema-registry:7.2.1
     hostname: schema-registry
     container_name: schema-registry
     depends_on:
@@ -144,4 +150,26 @@ services:
       SCHEMA_REGISTRY_HOST_NAME: schema-registry
       SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS: 'broker1:29092'
       SCHEMA_REGISTRY_LISTENERS: http://0.0.0.0:8081
+
+  kafka-ui:
+    container_name: kafka-ui
+    image: provectuslabs/kafka-ui:latest
+    ports:
+      - 8080:8080
+    environment:
+      SPRING_CONFIG_ADDITIONAL-LOCATION: /config.yml
+    volumes:
+      - ./kui/config.yml:/config.yml
+
+  kafka-init-topics:
+    image: confluentinc/cp-kafka:7.2.1
+    depends_on:
+      - broker1
+      - schema-registry
+    command: "bash -c 'echo Waiting for Kafka to be ready... && \
+      cub kafka-ready -b broker1:29092 1 30 && \
+      kafka-topics --create --topic factory.info --partitions 7 --replication-factor 3 --if-not-exists --bootstrap-server broker1:29092 --config cleanup.policy=compact && \
+      kafka-topics --create --topic factory.switch --partitions 6 --replication-factor 3 --if-not-exists --bootstrap-server broker1:29092 --config cleanup.policy=compact && \
+      kafka-topics --create --topic factory.repair --partitions 9 --replication-factor 3 --if-not-exists --bootstrap-server broker1:29092 --config cleanup.policy=compact && \
+      kafka-topics --create --topic factory.data --partitions 3 --replication-factor 3 --if-not-exists --bootstrap-server broker1:29092'"
 
